@@ -5,7 +5,7 @@ import (
 	"time"
 
 	fs "cloud.google.com/go/firestore"
-	"github.com/kellegous/go/internal"
+	"github.com/CliffLin/go/internal"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -43,7 +43,7 @@ func (backend *Backend) Close() error {
 }
 
 // Get retreives a shortcut from the data store.
-func (backend *Backend) Get(ctx context.Context, name string) (*internal.Route, error) {
+func (backend *Backend) Get(ctx context.Context, name string) (value []byte, err error) {
 	ref := backend.db.Doc("routes/" + name)
 
 	snap, err := ref.Get(ctx)
@@ -54,24 +54,19 @@ func (backend *Backend) Get(ctx context.Context, name string) (*internal.Route, 
 		return nil, err
 	}
 
-	var rt internal.Route
-	if err := snap.DataTo(&rt); err != nil {
+	if err := snap.DataTo(&value); err != nil {
 		return nil, err
 	}
 
-	return &rt, nil
+	return value, nil
 }
 
 // Put stores a new shortcut in the data store.
-func (backend *Backend) Put(ctx context.Context, key string, rt *internal.Route) error {
+func (backend *Backend) Put(ctx context.Context, key string, buf []byte) error {
 	ref := backend.db.Doc("routes/" + key)
 
-	_, err := ref.Set(ctx, rt)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := ref.Set(ctx, buf)
+	return err
 }
 
 // Del removes an existing shortcut from the data store.
@@ -79,15 +74,11 @@ func (backend *Backend) Del(ctx context.Context, key string) error {
 	ref := backend.db.Doc("routes/" + key)
 
 	_, err := ref.Delete(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // List all routes in an iterator, starting with the key prefix of start (which can also be nil).
-func (backend *Backend) List(ctx context.Context, start string) (internal.RouteIterator, error) {
+func (backend *Backend) List(ctx context.Context, start string) (map[string]internal.Route, error) {
 	col := backend.db.Collection("routes").OrderBy(fs.DocumentID, fs.Asc)
 
 	if start != "" {
@@ -95,11 +86,19 @@ func (backend *Backend) List(ctx context.Context, start string) (internal.RouteI
 		col = col.StartAt(start)
 	}
 
-	return &RouteIterator{
-		ctx: ctx,
-		db:  backend.db,
-		it:  col.Documents(ctx),
-	}, nil
+	routes, err := col.Documents(ctx).GetAll()
+	if err != nil {
+		return nil, err
+	}
+	golinks := map[string]internal.Route{}
+	for _, doc := range routes {
+		var rt internal.Route
+		if err := doc.DataTo(&rt); err != nil {
+			return nil, err
+		}
+		golinks[doc.Ref.ID] = rt
+	}
+	return golinks, nil
 }
 
 // GetAll gets everything in the db to dump it out for backup purposes

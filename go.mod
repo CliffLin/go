@@ -1,10 +1,11 @@
-module github.com/kellegous/go
+module github.com/CliffLin/go
 
 go 1.13
 
 require (
 	cloud.google.com/go v0.38.0
 	github.com/googleapis/gax-go v2.0.2+incompatible // indirect
+	github.com/jteeuwen/go-bindata v3.0.7+incompatible // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.5.0
 	github.com/syndtr/goleveldb v1.0.0

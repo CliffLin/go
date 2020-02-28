@@ -51,7 +51,6 @@ func (o *Route) Read(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-
 	o.URL = string(b)
 	o.Time = time.Unix(0, t)
 	return nil

@@ -9,10 +9,10 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/kellegous/go/backend"
-	"github.com/kellegous/go/backend/firestore"
-	"github.com/kellegous/go/backend/leveldb"
-	"github.com/kellegous/go/web"
+	"github.com/CliffLin/go/backend"
+	"github.com/CliffLin/go/backend/firestore"
+	"github.com/CliffLin/go/backend/leveldb"
+	"github.com/CliffLin/go/web"
 )
 
 func main() {
@@ -55,5 +55,7 @@ func main() {
 
 	defer backend.Close()
 
-	log.Panic(web.ListenAndServe(backend))
+	store := web.NewStore(backend)
+
+	log.Panic(web.ListenAndServe(store))
 }

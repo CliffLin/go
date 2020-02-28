@@ -4,15 +4,13 @@ import (
 	"context"
 	"net/http"
 	"time"
-
-	"github.com/kellegous/go/backend"
 )
 
 type adminHandler struct {
-	backend backend.Backend
+	store Store
 }
 
-func adminGet(backend backend.Backend, w http.ResponseWriter, r *http.Request) {
+func adminGet(store Store, w http.ResponseWriter, r *http.Request) {
 	p := parseName("/admin/", r.URL.Path)
 
 	if p == "" {
@@ -24,7 +22,7 @@ func adminGet(backend backend.Backend, w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if p == "dumps" {
-		if golinks, err := backend.GetAll(ctx); err != nil {
+		if golinks, err := store.GetLinks(ctx, ""); err != nil {
 			writeJSONBackendError(w, err)
 			return
 		} else {
@@ -37,7 +35,7 @@ func adminGet(backend backend.Backend, w http.ResponseWriter, r *http.Request) {
 func (h *adminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		adminGet(h.backend, w, r)
+		adminGet(h.store, w, r)
 	default:
 		writeJSONError(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusOK) // fix
 	}

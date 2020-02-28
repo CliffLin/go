@@ -13,7 +13,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 
-	"github.com/kellegous/go/internal"
+	"github.com/CliffLin/go/internal"
 )
 
 const (
@@ -61,7 +61,6 @@ func load(filename string) (uint64, error) {
 	if err := binary.Read(r, binary.LittleEndian, &id); err != nil {
 		return 0, err
 	}
-
 	return id, nil
 }
 
@@ -99,31 +98,21 @@ func (backend *Backend) Close() error {
 }
 
 // Get retreives a shortcut from the data store.
-func (backend *Backend) Get(ctx context.Context, name string) (*internal.Route, error) {
-	val, err := backend.db.Get([]byte(name), nil)
+func (backend *Backend) Get(ctx context.Context, name string) (value []byte, err error) {
+	value, err = backend.db.Get([]byte(name), nil)
+
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
 			return nil, internal.ErrRouteNotFound
 		}
 		return nil, err
 	}
-
-	rt := &internal.Route{}
-	if err := rt.Read(bytes.NewBuffer(val)); err != nil {
-		return nil, err
-	}
-
-	return rt, nil
+	return
 }
 
 // Put stores a new shortcut in the data store.
-func (backend *Backend) Put(ctx context.Context, key string, rt *internal.Route) error {
-	var buf bytes.Buffer
-	if err := rt.Write(&buf); err != nil {
-		return err
-	}
-
-	return backend.db.Put([]byte(key), buf.Bytes(), &opt.WriteOptions{Sync: true})
+func (backend *Backend) Put(ctx context.Context, key string, buf []byte) error {
+	return backend.db.Put([]byte(key), buf, &opt.WriteOptions{Sync: true})
 }
 
 // Del removes an existing shortcut from the data store.
@@ -132,19 +121,12 @@ func (backend *Backend) Del(ctx context.Context, key string) error {
 }
 
 // List all routes in an iterator, starting with the key prefix of start (which can also be nil).
-func (backend *Backend) List(ctx context.Context, start string) (internal.RouteIterator, error) {
-	return &RouteIterator{
-		it: backend.db.NewIterator(&util.Range{
-			Start: []byte(start),
-			Limit: nil,
-		}, nil),
-	}, nil
-}
-
-// GetAll gets everything in the db to dump it out for backup purposes
-func (backend *Backend) GetAll(ctx context.Context) (map[string]internal.Route, error) {
+func (backend *Backend) List(ctx context.Context, start string) (map[string]internal.Route, error) {
 	golinks := map[string]internal.Route{}
-	iter := backend.db.NewIterator(nil, nil)
+	iter := backend.db.NewIterator(&util.Range{
+		Start: []byte(start),
+		Limit: nil,
+	}, nil)
 	defer iter.Release()
 
 	for iter.Next() {
@@ -162,6 +144,11 @@ func (backend *Backend) GetAll(ctx context.Context) (map[string]internal.Route, 
 	}
 
 	return golinks, nil
+}
+
+// GetAll gets everything in the db to dump it out for backup purposes
+func (backend *Backend) GetAll(ctx context.Context) (map[string]internal.Route, error) {
+	return backend.List(ctx, "")
 }
 
 func (backend *Backend) commit(id uint64) error {
@@ -190,4 +177,21 @@ func (backend *Backend) NextID(ctx context.Context) (uint64, error) {
 	}
 
 	return backend.id, nil
+}
+
+// Iterate iterates the values in the namespace.
+func (backend *Backend) Iterate(ctx context.Context, f func(key string, value []byte) (next bool)) error {
+	iter := backend.db.NewIterator(&util.Range{
+		Start: []byte(""),
+		Limit: nil,
+	}, nil)
+	for iter.Next() {
+		n := f(string(iter.Key()[:]), iter.Value())
+		if !n {
+			break
+		}
+	}
+	iter.Release()
+	err := iter.Error()
+	return err
 }
